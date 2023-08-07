@@ -1,0 +1,5 @@
+pandas~=2.0.3
+openpyxl
+pysimplegui~=4.60.5
+pyinstaller
+numpy~=1.25.1
