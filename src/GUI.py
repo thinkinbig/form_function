@@ -15,32 +15,40 @@ class GUIView:
         # init window
         self.layout = [
             [sg.Text('选择输出文件名;')],
-            [sg.InputText(key='-OUTPUT-', default_text='输出.xlsx')],
+            [sg.InputText(key='-OUTPUT-', default_text=os.path.join(os.getcwd(), '输出.xlsx'))],
             [sg.Text('选择引入模版文件:')],
-            [sg.Input(key='-INPUT-'), sg.FileBrowse(button_text="选择文件",
-                                                    file_types=(('Excel Files', '*.xlsx'),
-                                                                ('Excel Files', '*.xls')),
-                                                    initial_folder=os.getcwd()), ],
-            [sg.Text('选择操作力计算数据表文件:')],
-            [sg.Input(key='-OPERATION-'), sg.FileBrowse(button_text="选择文件",
+            [sg.InputText(key='-INPUT-'), sg.FileBrowse(button_text="选择文件",
                                                         file_types=(('Excel Files', '*.xlsx'),
                                                                     ('Excel Files', '*.xls')),
                                                         initial_folder=os.getcwd()), ],
+            [sg.Text('选择操作力计算数据表文件:')],
+            [sg.InputText(key='-OPERATION-',
+                          default_text=os.path.join(os.getcwd(), "计算操作力表格.xlsx")),
+             sg.FileBrowse(button_text="选择文件",
+                           file_types=(('Excel Files', '*.xlsx'),
+                                       ('Excel Files', '*.xls')),
+                           initial_folder=os.getcwd()), ],
             [sg.Text('选择标准格式文件:')],
-            [sg.Input(key='-STANDARD-'), sg.FileBrowse(button_text="选择文件",
-                                                       file_types=(('Excel Files', '*.xlsx'),
-                                                                   ('Excel Files', '*.xls')),
-                                                       initial_folder=os.getcwd())],
+            [sg.InputText(key='-STANDARD-',
+                          default_text=os.path.join(os.getcwd(),"标准格式.xlsx")),
+             sg.FileBrowse(button_text="选择文件",
+                           file_types=(('Excel Files', '*.xlsx'),
+                                       ('Excel Files', '*.xls')),
+                           initial_folder=os.getcwd())],
             [sg.Text('选择阀门特征系数:')],
-            [sg.Input(key='-VALVE-CHARACTERISTIC-'), sg.FileBrowse(button_text="选择文件",
-                                                                   file_types=(('Excel Files', '*.xlsx'),
-                                                                               ('Excel Files', '*.xls')),
-                                                                   initial_folder=os.getcwd())],
+            [sg.InputText(key='-VALVE-CHARACTERISTIC-',
+                          default_text=os.path.join(os.getcwd(), "阀门特征系数表.xlsx")),
+             sg.FileBrowse(button_text="选择文件",
+                           file_types=(('Excel Files', '*.xlsx'),
+                                       ('Excel Files', '*.xls')),
+                           initial_folder=os.getcwd())],
             [sg.Text('选择cv表:')],
-            [sg.Input(key='-CV-'), sg.FileBrowse(button_text="选择文件",
-                                                 file_types=(('Excel Files', '*.xlsx'),
-                                                             ('Excel Files', '*.xls')),
-                                                 initial_folder=os.getcwd())],
+            [sg.InputText(key='-CV-',
+                          default_text=os.path.join(os.getcwd(), "Cv值表.xlsx")),
+             sg.FileBrowse(button_text="选择文件",
+                           file_types=(('Excel Files', '*.xlsx'),
+                                       ('Excel Files', '*.xls')),
+                           initial_folder=os.getcwd())],
             [sg.Button('开始'), sg.Button('取消')]
         ]
 
@@ -53,31 +61,31 @@ class GUIView:
     @property
     def input(self):
         if not is_valid_path(self.window['-INPUT-'].get(), '.xlsx'):
-            raise ValueError('Invalid input file')
+            raise ValueError('Invalid input file or path does not exist')
         return self.window['-INPUT-'].get()
 
     @property
     def operation(self):
         if not is_valid_path(self.window['-OPERATION-'].get(), '.xlsx'):
-            raise ValueError('Invalid operation file')
+            raise ValueError('Invalid operation file or path does not exist')
         return self.window['-OPERATION-'].get()
 
     @property
     def standard(self):
         if not is_valid_path(self.window['-STANDARD-'].get(), '.xlsx'):
-            raise ValueError('Invalid standard file')
+            raise ValueError('Invalid standard file or path does not exist')
         return self.window['-STANDARD-'].get()
 
     @property
     def valve_characteristic(self):
         if not is_valid_path(self.window['-VALVE-CHARACTERISTIC-'].get(), '.xlsx'):
-            raise ValueError('Invalid valve characteristic file')
+            raise ValueError('Invalid valve characteristic file or path does not exist')
         return self.window['-VALVE-CHARACTERISTIC-'].get()
 
     @property
     def cv_path(self):
         if not is_valid_path(self.window['-CV-'].get(), '.xlsx'):
-            raise ValueError('Invalid cv file')
+            raise ValueError('Invalid cv file or path does not exist')
         return self.window['-CV-'].get()
 
     @property
@@ -109,8 +117,8 @@ class GUIView:
         # attach input, operation, standard, valve_characteristic file to service
         self.service.attach(self)
         progress_layout = [[sg.Text('任务完成进度')],
-                                [sg.ProgressBar(self.task_size, orientation='h', size=(20, 20), key='-PROGRESS-')],
-                                [sg.Cancel()]]
+                           [sg.ProgressBar(self.task_size, orientation='h', size=(20, 20), key='-PROGRESS-')],
+                           [sg.Cancel()]]
         self.progress_window = sg.Window('任务进度', progress_layout)
 
         progress = 0

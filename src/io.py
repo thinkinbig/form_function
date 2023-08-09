@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 
 
@@ -18,7 +20,7 @@ def is_valid_path(path: str, extension: str) -> bool:
     :param extension: file extension
     :return: True if path is valid, False otherwise
     """
-    return path.endswith(extension)
+    return path.endswith(extension) and os.path.exists(path)
 
 
 def read_sheet_by_index(excel_path: str, sheet_index: int, skiprows=None) -> pd.DataFrame:

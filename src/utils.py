@@ -1,6 +1,6 @@
 import logging
 
-from src.exceptions import EmptyException, FormatError
+from src.exceptions import EmptyException, FormatError, ExtractError
 
 
 def ignore_value(func):
@@ -55,10 +55,20 @@ def in_to_mm(string: str) -> float:
     try:  # 如果是数字，则直接返回
         result = float(string)
         if is_inch:
+            logging.debug(f"inch: {result}")
             result *= 25.4
         return result
     except ValueError:
         raise FormatError("格式错误")
+
+
+def is_inch(string: str) -> bool:
+    return "''" in string or "“" in string or '"' in string or "in" in string
+
+
+def replace_inch(string: str) -> str:
+    assert is_inch(string)
+    return string.replace("''", "").replace("“", "").replace('"', "").replace("in", "")
 
 
 def ignore_unit(func):
@@ -160,3 +170,34 @@ def special_roman_to_int(roman_numeral: str):
             else:
                 total -= roman_values[c]
         return total
+
+
+def extract_value_before_keyword(s: str):
+    boundary = s.find('-')  # 找到数值的边界
+
+    if boundary is None:
+        raise ExtractError("提取错误, 没有找到边界-")
+
+    start = boundary + 1
+
+    for i in range(boundary, len(s)):
+        if s[i].lower() == 'x' or s[i] == '*':
+            start = i + 1  # 找到数值的起始点
+            break
+
+    if start == len(s):
+        raise ExtractError("提取错误, 没有找到数值")
+
+    end = start
+    while end < len(s) and s[end].isdigit():
+        end += 1  # 找到数值的结束点
+
+    return s[start:end]
+
+
+def extract_value(s: str):
+    value = extract_value_before_keyword(s)
+    if value is not None and is_number(value):
+        return value
+    else:
+        raise ExtractError("提取错误, 没有找到数值")

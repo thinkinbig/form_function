@@ -9,12 +9,12 @@ from typing import TYPE_CHECKING
 from src import HJ
 from src.DataTableObject import DataTableObject, NO_MARK, HIGHLIGHT_MARK, FONT_MARK
 from src.CalculationHandler import CalculationHandler
-from src.standard import TemperatureUnit, PressureUnit, FlowUnit, DensityUnit, MolecularWeightUnit, \
-    get_standard_diameter, N2, N5
-from src.exceptions import SteamFormatError, QueryBeforeCalculationError, NotAttachedException, FormatError
+from src.standard import TemperatureUnit, PressureUnit, FlowUnit, DensityUnit, MolecularWeightUnit, N2, N5
+from src.exceptions import SteamFormatError, QueryBeforeCalculationError, NotAttachedException, FormatError, \
+    ExtractError
 from src.io import read_sheet_by_index, read_sheet_by_name
 from src.utils import ignore_value, EmptyException, in_to_mm, ignore_unit, is_number, float_to_percent_str, \
-    float_rounding
+    float_rounding, extract_value, is_inch, replace_inch
 
 if TYPE_CHECKING:
     from src.GUI import GUIView
@@ -79,6 +79,7 @@ class MainService:
         # 阀门型号
         # 阀座通径
         valve_d = self.d
+        logging.debug(f"value_d: {valve_d}")
         # 阀门类型
         valve_type = self.valve_type
         # get first two characters of valve type
@@ -542,11 +543,45 @@ class MainService:
             return self.dto['F_BEM_FZTJ']
         except EmptyException:
             # 若没有直接提供阀座通径的尺寸数据，则读取 F_BEM_GCTJXS 公称通径销售的数据。
-            result = in_to_mm(str(self.dto['F_BEM_GCTJXS']))
-            result = get_standard_diameter(result)
-            # 保存到dto中
-            self.dto['F_BEM_FZTJ'] = result
-            return result
+            gctjxs = str(self.dto['F_BEM_GCTJXS'])
+            try:
+                d = self.get_valid_d(self.valve_type, gctjxs)
+                d = float(d)
+                # 保存到dto中
+                self.dto['F_BEM_FZTJ'] = d
+                return d
+            except ExtractError:
+                self.dto['F_BEM_ROW_ERROR'] = '阀座通径数据格式错误'
+                raise EmptyException('阀座通径数据格式错误')
+
+    @staticmethod
+    def get_valid_d(valve_type: str, gctjxs: str) -> float:
+        """
+        获取有效的阀座通径
+        Returns
+        -------
+
+        """
+        if (gctjxs.startswith('DN') and is_number(gctjxs[2:])) or is_number(gctjxs):
+            # 取出对应P或B或CL之前的值， 就近取最近的字母
+            # 例如：P121EY-25*15P25P， 取出15
+            # 例如：P121EY-25P25B， 取出25
+            logging.debug(f"extract value: {gctjxs} {valve_type}")
+            value = extract_value(valve_type)
+            logging.debug(f"extract value: {value}")
+        elif is_inch(gctjxs):
+            value = float(extract_value(valve_type))
+            if value == float(replace_inch(gctjxs)):
+                value = value * 25.4
+            else:
+                value = float(replace_inch(gctjxs)) * 25.4
+                delta = 5
+                value1 = float(extract_value(valve_type))
+                if abs(value - value1) < delta:
+                    value = value1
+        else:
+            raise FormatError(f"Invalid gctjxs: {gctjxs}")
+        return value
 
     @property
     def D(self) -> float:

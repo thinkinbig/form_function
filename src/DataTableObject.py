@@ -41,6 +41,16 @@ class CustomExcelPainter:
         if font:
             cell.font = self.font
 
+    def mark_row(self, row_index: int, color: Color):
+        """
+        Mark the row with color
+        :param row_index: row index
+        :param color: color
+        :return: None
+        """
+        for cell in self.worksheet[row_index]:
+            cell.fill = PatternFill(start_color=color, end_color=color, fill_type='solid')
+
     def save(self):
         self.workbook.save(self.output_path)
 
@@ -95,6 +105,7 @@ class DataTableObject:
         painter = CustomExcelPainter(output_path)
         self._paint_cv_cells(painter)
         self._paint_open_rate_cells(painter)
+        self._paint_entire_line(painter)
         self._remove_flag_columns(painter)
         painter.save()
 
@@ -142,6 +153,16 @@ class DataTableObject:
                 assert flag is not None
                 column = painter.column_index_by_name(open_rate_columns[i])
                 painter.paint(row_index, column, font=(flag & FONT_MARK) != 0, pattern=(flag & HIGHLIGHT_MARK) != 0)
+
+    @staticmethod
+    @ignore_value
+    def _paint_entire_line(painter: CustomExcelPainter):
+        for row_index in range(3, painter.worksheet.max_row + 1):
+            column_flag = "F_BEM_ROW_ERROR"
+            flag = painter.worksheet.cell(row=row_index, column=painter.column_index_by_name(column_flag)).value
+            logging.debug(f"f_BEM_ROW_ERROR {flag}")
+            if flag is not None:
+                painter.mark_row(row_index, CustomExcelPainter.RED)
 
     @staticmethod
     @ignore_value

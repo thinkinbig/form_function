@@ -17,6 +17,9 @@ class QueryBeforeCalculationError(Exception):
 class MediumStatusError(Exception):
     pass
 
+class ExtractError(Exception):
+    pass
+
 
 class NotAttachedException(Exception):
     pass
