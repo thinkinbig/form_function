@@ -562,26 +562,20 @@ class MainService:
         -------
 
         """
-        if (gctjxs.startswith('DN') and is_number(gctjxs[2:])) or is_number(gctjxs):
-            # 取出对应P或B或CL之前的值， 就近取最近的字母
-            # 例如：P121EY-25*15P25P， 取出15
-            # 例如：P121EY-25P25B， 取出25
-            logging.debug(f"extract value: {gctjxs} {valve_type}")
-            value = extract_value(valve_type)
-            logging.debug(f"extract value: {value}")
-        elif is_inch(gctjxs):
-            value = float(extract_value(valve_type))
-            if value == float(replace_inch(gctjxs)):
-                value = value * 25.4
+
+        gctj, sj = extract_value(valve_type)
+        if is_inch(gctjxs):
+            tj = float(replace_inch(gctjxs)) * 25.4
+            if abs(gctj / tj) < 20:
+                return sj
             else:
-                value = float(replace_inch(gctjxs)) * 25.4
-                delta = 5
-                value1 = float(extract_value(valve_type))
-                if abs(value - value1) < delta:
-                    value = value1
+                return sj * 25.4
+        elif is_number(gctjxs):
+            return float(gctjxs)
+        elif gctjxs.startswith('DN'):
+            return float(gctjxs[2:])
         else:
-            raise FormatError(f"Invalid gctjxs: {gctjxs}")
-        return value
+            raise FormatError('阀座通径数据格式错误')
 
     @property
     def D(self) -> float:

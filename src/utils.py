@@ -172,32 +172,35 @@ def special_roman_to_int(roman_numeral: str):
         return total
 
 
-def extract_value_before_keyword(s: str):
+def extract_value_before_keyword(s: str) -> tuple[int, int]:
     boundary = s.find('-')  # 找到数值的边界
 
     if boundary is None:
         raise ExtractError("提取错误, 没有找到边界-")
 
-    start = boundary + 1
+    mid = start = boundary + 1
 
     for i in range(boundary, len(s)):
         if s[i].lower() == 'x' or s[i] == '*':
-            start = i + 1  # 找到数值的起始点
+            mid = i  # 找到数值的分割点
             break
 
-    if start == len(s):
-        raise ExtractError("提取错误, 没有找到数值")
-
-    end = start
+    end = mid + 1
     while end < len(s) and s[end].isdigit():
         end += 1  # 找到数值的结束点
 
-    return s[start:end]
+    if mid == start:
+        # 如果没有找到分割点，则直接返回
+        if not is_number(s[start:end]):
+            raise ExtractError("提取错误, 数值不是数字")
+        return int(s[start:end]), int(s[start:end])
+
+    if not is_number(s[start:mid]) or not is_number(s[mid + 1:end]):
+        raise ExtractError("提取错误, 数值不是数字")
+    return int(s[start:mid]), int(s[mid + 1:end])
 
 
-def extract_value(s: str):
-    value = extract_value_before_keyword(s)
-    if value is not None and is_number(value):
-        return value
-    else:
-        raise ExtractError("提取错误, 没有找到数值")
+def extract_value(s: str) -> tuple[int, int]:
+    logging.debug(f"extract_value: {s}")
+    gctj, sj = extract_value_before_keyword(s)
+    return gctj, sj

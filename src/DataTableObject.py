@@ -160,7 +160,6 @@ class DataTableObject:
         for row_index in range(3, painter.worksheet.max_row + 1):
             column_flag = "F_BEM_ROW_ERROR"
             flag = painter.worksheet.cell(row=row_index, column=painter.column_index_by_name(column_flag)).value
-            logging.debug(f"f_BEM_ROW_ERROR {flag}")
             if flag is not None:
                 painter.mark_row(row_index, CustomExcelPainter.RED)
 
