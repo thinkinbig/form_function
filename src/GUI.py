@@ -3,7 +3,7 @@ import os
 import PySimpleGUI as sg
 
 from src.io import is_valid_path
-from src.service import MainService
+from src.service.gui_service import MainService
 
 
 class GUIView:

@@ -17,6 +17,7 @@ class QueryBeforeCalculationError(Exception):
 class MediumStatusError(Exception):
     pass
 
+
 class ExtractError(Exception):
     pass
 
@@ -30,4 +31,8 @@ class UnitConversionError(Exception):
 
 
 class LeakingLevelError(Exception):
+    pass
+
+
+class UploadFileError(Exception):
     pass

@@ -12,7 +12,7 @@ from src.standard import KELVIN_CONST, N8, N9, N6, N1
 from src.utils import special_roman_to_int, ignore_value
 
 if typing.TYPE_CHECKING:
-    from src.service import MainService
+    from src.service.gui_service import MainService
 
 
 class CalculationHandler:
@@ -124,7 +124,7 @@ class CalculationHandler:
 
     def get_row_by_range(self) -> pd.Series:
         service_instance = self.service_instance
-        torque_w1_df = read_sheet_by_index(service_instance.gui.operation, 2)
+        torque_w1_df = read_sheet_by_index(service_instance.provider.operation, 2)
         d = service_instance.d
         for index, row in torque_w1_df.iterrows():
             if int(row[0][2:]) <= d < int(row[1][2:]):
@@ -185,7 +185,7 @@ class CalculationHandler:
 
     def get_row_by_d(self, i: int) -> pd.Series:
         service_instance = self.service_instance
-        torque_m9_df = read_sheet_by_index(service_instance.gui.operation, i, skiprows=1)
+        torque_m9_df = read_sheet_by_index(service_instance.provider.operation, i, skiprows=1)
         d = service_instance.d
         for index, row in torque_m9_df.iterrows():
             if int(row[0]) == d:
@@ -194,7 +194,7 @@ class CalculationHandler:
 
     def force_p(self) -> tuple[float, float]:
         service_instance = self.service_instance
-        force_p_df = read_sheet_by_index(service_instance.gui.operation, 1, skiprows=1)
+        force_p_df = read_sheet_by_index(service_instance.provider.operation, 1, skiprows=1)
         row = self.get_nearest_searching_row(force_p_df)
         ds = row[1]
         dg = row[2]
@@ -224,7 +224,7 @@ class CalculationHandler:
 
     def force_m(self) -> tuple[float, float]:
         service_instance = self.service_instance
-        force_m_df = read_sheet_by_index(service_instance.gui.operation, 0, skiprows=1)
+        force_m_df = read_sheet_by_index(service_instance.provider.operation, 0, skiprows=1)
         row = self.get_nearest_searching_row(force_m_df)
         P1_array = []
         P2_array = []

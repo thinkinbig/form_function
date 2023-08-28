@@ -1,7 +1,7 @@
 import logging
 
 from src.GUI import GUIView
-from src.service import MainService
+from src.service.gui_service import MainService
 
 
 if __name__ == "__main__":

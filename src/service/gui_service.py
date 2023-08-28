@@ -4,7 +4,6 @@ import os
 
 import pandas as pd
 
-from typing import TYPE_CHECKING
 
 from src import HJ
 from src.DataTableObject import DataTableObject, NO_MARK, HIGHLIGHT_MARK, FONT_MARK
@@ -15,9 +14,6 @@ from src.exceptions import SteamFormatError, QueryBeforeCalculationError, NotAtt
 from src.io import read_sheet_by_index, read_sheet_by_name
 from src.utils import ignore_value, EmptyException, in_to_mm, ignore_unit, is_number, float_to_percent_str, \
     float_rounding, extract_value, is_inch, replace_inch
-
-if TYPE_CHECKING:
-    from src.GUI import GUIView
 
 
 class MainService:
@@ -36,10 +32,10 @@ class MainService:
         self.fl_xt_fd_filled = False
 
         self.dto = None
-        self.gui = None
+        self.provider = None
 
-    def attach(self, gui: 'GUIView') -> None:
-        self.gui = gui
+    def attach(self, provider) -> None:
+        self.provider = provider
         self.on_attach()
         self.attached = True
 
@@ -54,7 +50,7 @@ class MainService:
         return self.dto.dataframe.shape[0] - 1
 
     def on_attach(self) -> None:
-        self.dto = DataTableObject(self.gui.standard, self.gui.input)
+        self.dto = DataTableObject(self.provider.standard, self.provider.input)
 
     def cv_exists(self) -> bool:
         """
@@ -84,7 +80,7 @@ class MainService:
         valve_type = self.valve_type
         # get first two characters of valve type
         if valve_type[:2] == 'M2':
-            cv_sheet = read_sheet_by_name(self.gui.cv_path, 'M2', 1)
+            cv_sheet = read_sheet_by_name(self.provider.cv_path, 'M2', 1)
             # 读取就近的阀座通径行
             cv_row = cv_sheet.loc[(cv_sheet['FZTJ'] - valve_d).abs().argsort()[:1]]
             # 判断流量特性是否是等百分比的
@@ -97,7 +93,7 @@ class MainService:
         else:
             # 读取额定cv
             logging.debug(f'valve type: {valve_type[:2]} valve d: {valve_d}')
-            cv_sheet = read_sheet_by_name(self.gui.cv_path, valve_type[:2])
+            cv_sheet = read_sheet_by_name(self.provider.cv_path, valve_type[:2])
             cv = cv_sheet.loc[cv_sheet['阀座通径'].apply(lambda x: abs(x - valve_d)).idxmin(), '额定Cv']
         self.dto['F_BEM_EDCv'] = cv
 
@@ -110,7 +106,7 @@ class MainService:
         None
 
         """
-        characteristic_df = read_sheet_by_index(self.gui.valve_characteristic, 0)
+        characteristic_df = read_sheet_by_index(self.provider.valve_characteristic, 0)
         # 阀门型号
         valve_type = self.valve_type
         # 读取流向

@@ -204,3 +204,9 @@ def extract_value(s: str) -> tuple[int, int]:
     logging.debug(f"extract_value: {s}")
     gctj, sj = extract_value_before_keyword(s)
     return gctj, sj
+
+
+def allowed_file(filename):
+    ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'xlsx', 'xls', 'doc', 'docx', 'ppt', 'pptx'}
+    return '.' in filename and \
+        filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
