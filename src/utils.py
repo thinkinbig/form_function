@@ -3,7 +3,7 @@ import logging
 from src.exceptions import EmptyException, FormatError, ExtractError
 
 
-def ignore_value(func):
+def ignore_value(func, post_process=None):
     """
     Decorator to ignore empty value
     注意：这个装饰器只能用于函数，不能用于类
@@ -22,6 +22,12 @@ def ignore_value(func):
         except FormatError as e:
             logging.debug(e)
             pass
+        except Exception as e:
+            logging.error(e)
+            import traceback
+            traceback.print_exception(e)
+            pass
+
 
     return wrapper
 

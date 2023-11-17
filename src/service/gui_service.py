@@ -21,6 +21,7 @@ class MainService:
     open_rate_flag_keys = ['F_BEM_JSKDPD1', 'F_BEM_JSKDPD2', 'F_BEM_JSKDPD3']
     cv_keys = ['F_BEM_QtyJSCV', 'F_BEM_QtyJSCVnro', 'F_BEM_QtyJSCVmax']
     cv_flag_keys = ['F_BEM_QtyJSCVPD1', 'F_BEM_QtyJSCVPD2', 'F_BEM_QtyJSCVPD3']
+    error_flag_key = 'F_BEM_ROW_ERROR'
     liquid_speed_keys = ['F_BEM_QtyJSHKLS', 'F_BEM_QtyJSHKLSnro', 'F_BEM_QtyJSHKLSmax']
     noise_keys = ['F_BEM_JSZY', 'F_BEM_Text2', 'F_BEM_Text3']
     close_operation_key = 'F_BEM_QtyJSCZL'
@@ -252,10 +253,14 @@ class MainService:
                 if F_o != 0:
                     self.dto[self.open_operation_key] = float_rounding(F_o)
             logging.debug(f"Finish to calculate force")
+        except EmptyException as e:
+            logging.debug(e)
         except QueryBeforeCalculationError as e:
             logging.error(e)
-        except EmptyException as e:
+        except ValueError as e:
+            self.dto[self.error_flag_key] = 1
             logging.error(e)
+
 
     @staticmethod
     def _pressure(value: float, unit: str) -> float:
@@ -314,7 +319,11 @@ class MainService:
         close_delta_p = self.dto['F_BEM_GBYC']
         if not is_number(close_delta_p):
             raise FormatError('Delta P is not a number')
-        return self._pressure(float(close_delta_p), self.dto['F_BEM_GBYCDW'])
+        try:
+            return self._pressure(float(close_delta_p), self.dto['F_BEM_GBYCDW'])
+        except ValueError as e:
+            logging.error(e)
+            self.dto[self.error_flag_key] = 1
 
     @property
     def z1(self) -> float:
@@ -351,10 +360,14 @@ class MainService:
         """
         if not self.attached:
             raise NotAttachedException('Rho accessed before attached')
+        try:
+            rho = ignore_unit(lambda: self.dto['F_BEM_ROH'])()
+            rho_unit = self.dto['F_BEM_LLDWCOBOM11211']
+            return self._density(rho, rho_unit)
+        except ValueError as e:
+            logging.error(e)
+            self.dto[self.error_flag_key] = 1
 
-        rho = float(ignore_unit(lambda: self.dto['F_BEM_ROH'])())
-        rho_unit = self.dto['F_BEM_LLDWCOBOM11211']
-        return self._density(rho, rho_unit)
 
     def q(self, index: int) -> float:
         """
@@ -406,7 +419,11 @@ class MainService:
         pressure_unit = self.dto['F_BEM_YLDWCOBOM1']
         if not is_number(str(self.dto[keys[index]])):
             raise FormatError('p1 must be number')
-        return self._pressure(float(self.dto[keys[index]]), pressure_unit)
+        try:
+            return self._pressure(float(self.dto[keys[index]]), pressure_unit)
+        except ValueError as e:
+            logging.error(e)
+            self.dto[self.error_flag_key] = 1
 
     def p2(self, index: int):
         """
@@ -418,7 +435,11 @@ class MainService:
         pressure_unit = self.dto['F_BEM_LLDWCOBOM11']
         if not is_number(str(self.dto[keys[index]])):
             raise FormatError('p2 must be number')
-        return self._pressure(float(self.dto[keys[index]]), pressure_unit)
+        try:
+            return self._pressure(float(self.dto[keys[index]]), pressure_unit)
+        except ValueError as e:
+            logging.error(e)
+            self.dto[self.error_flag_key] = 1
 
     def t1(self, index: int):
         if not self.attached:
@@ -427,7 +448,11 @@ class MainService:
         temperature_unit = self.dto['F_BEM_WDDW']
         if not is_number(str(self.dto[keys[index]])):
             raise FormatError('t1 must be number')
-        return self._temperature(float(self.dto[keys[index]]), temperature_unit)
+        try:
+            return self._temperature(float(self.dto[keys[index]]), temperature_unit)
+        except ValueError as e:
+            logging.error(e)
+            self.dto[self.error_flag_key] = 1
 
     @property
     def Ff(self) -> float:
@@ -437,6 +462,9 @@ class MainService:
             return 0.96 - 0.28 * (math.sqrt(self.Pv / self.Pc))
         except EmptyException:
             return 0.96
+        except ValueError as e:
+            logging.error(e)
+            self.dto[self.error_flag_key] = 1
 
     def c(self, index: int) -> float:
         """
@@ -547,8 +575,11 @@ class MainService:
                 self.dto['F_BEM_FZTJ'] = d
                 return d
             except ExtractError:
-                self.dto['F_BEM_ROW_ERROR'] = '阀座通径数据格式错误'
+                self.dto[self.error_flag_key] = 1
                 raise EmptyException('阀座通径数据格式错误')
+            except ValueError as e:
+                logging.error(e)
+                self.dto[self.error_flag_key] = 1
 
     @staticmethod
     def get_valid_d(valve_type: str, gctjxs: str) -> float:
@@ -647,7 +678,11 @@ class MainService:
         unit = self.dto["F_BEM_ZYDW1"]
         if not is_number(m):
             raise FormatError('M is not a number')
-        return MolecularWeightUnit.convert(float(m), unit)
+        try:
+            return MolecularWeightUnit.convert(float(m), unit)
+        except ValueError as e:
+            logging.error(e)
+            self.dto[self.error_flag_key] = 1
 
     @property
     def Fk(self) -> float:
@@ -819,6 +854,7 @@ class MainService:
         for i in range(3):
             self.dto[self.open_rate_flag_keys[i]] = NO_MARK
             self.dto[self.cv_flag_keys[i]] = NO_MARK
+            self.dto[self.error_flag_key] = NO_MARK
 
     def export(self, output_path: str) -> None:
         """

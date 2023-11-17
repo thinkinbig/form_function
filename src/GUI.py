@@ -101,8 +101,8 @@ class GUIView:
                 try:
                     self.on_start_clicked()
                 except Exception as e:
-                    sg.popup_error_with_traceback('出现错误', e)
-                    raise e
+                    sg.popup_error(e)
+                    continue
         self.window.close()
         return event, values
 

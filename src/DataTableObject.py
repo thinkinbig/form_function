@@ -160,13 +160,13 @@ class DataTableObject:
         for row_index in range(3, painter.worksheet.max_row + 1):
             column_flag = "F_BEM_ROW_ERROR"
             flag = painter.worksheet.cell(row=row_index, column=painter.column_index_by_name(column_flag)).value
-            if flag is not None:
+            if flag == 1:
                 painter.mark_row(row_index, CustomExcelPainter.RED)
 
     @staticmethod
     @ignore_value
     def _remove_flag_columns(painter: CustomExcelPainter):
         flag_columns = ['F_BEM_QtyJSCVPD1', 'F_BEM_QtyJSCVPD2', 'F_BEM_QtyJSCVPD3',
-                        'F_BEM_JSKDPD1', 'F_BEM_JSKDPD2', 'F_BEM_JSKDPD3']
+                        'F_BEM_JSKDPD1', 'F_BEM_JSKDPD2', 'F_BEM_JSKDPD3', 'F_BEM_ROW_ERROR']
         for column in flag_columns:
             painter.worksheet.delete_cols(painter.column_index_by_name(column))
