@@ -127,6 +127,8 @@ class FlowUnit:
         -------
 
         """
+        if rho == 0 or rho is None:
+            raise ValueError(f"Unknown density: {rho}")
         if unit == FlowUnit.KG_H:
             return value / rho
         else:

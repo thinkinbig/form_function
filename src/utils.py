@@ -1,6 +1,6 @@
 import logging
 
-from src.exceptions import EmptyException, FormatError, ExtractError
+from src.exceptions import EmptyException, FormatError, ExtractError, QueryBeforeCalculationError, UnitConversionError
 
 
 def ignore_value(func, post_process=None):
@@ -22,12 +22,20 @@ def ignore_value(func, post_process=None):
         except FormatError as e:
             logging.debug(e)
             pass
+        except QueryBeforeCalculationError as e:
+            logging.debug(e)
+            pass
+        except UnitConversionError as e:
+            logging.debug(e)
+            pass
+        except ValueError as e:
+            logging.debug(e)
+            pass
         except Exception as e:
             logging.error(e)
             import traceback
             traceback.print_exception(e)
             pass
-
 
     return wrapper
 

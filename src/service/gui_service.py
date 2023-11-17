@@ -4,7 +4,6 @@ import os
 
 import pandas as pd
 
-
 from src import HJ
 from src.DataTableObject import DataTableObject, NO_MARK, HIGHLIGHT_MARK, FONT_MARK
 from src.CalculationHandler import CalculationHandler
@@ -178,10 +177,11 @@ class MainService:
             except SteamFormatError as e:
                 logging.error(e)
                 self.dto[self.cv_keys[i]] = str(e)
+                # self.dto[self.cv_flag_keys[i]] = HIGHLIGHT_MARK ^ FONT_MARK
             except QueryBeforeCalculationError as e:
                 logging.debug(e)
             except EmptyException as e:
-                logging.error(e)
+                logging.debug(e)
         logging.debug(f"Finish to calculate cv")
 
         for i in range(3):
@@ -260,7 +260,6 @@ class MainService:
         except ValueError as e:
             self.dto[self.error_flag_key] = 1
             logging.error(e)
-
 
     @staticmethod
     def _pressure(value: float, unit: str) -> float:
@@ -367,7 +366,6 @@ class MainService:
         except ValueError as e:
             logging.error(e)
             self.dto[self.error_flag_key] = 1
-
 
     def q(self, index: int) -> float:
         """
