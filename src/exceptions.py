@@ -42,7 +42,7 @@ class ExtractError(Exception):
 
 class NotAttachedException(Exception):
     """
-    未添加错误
+    未激活错误
     """
     pass
 
@@ -62,4 +62,8 @@ class LeakingLevelError(Exception):
 
 
 class UploadFileError(Exception):
+    pass
+
+
+class ActualConditionError(Exception):
     pass

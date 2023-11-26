@@ -6,10 +6,10 @@ import typing
 import pandas as pd
 
 from src import HJ
-from src.exceptions import SteamFormatError, MediumStatusError, LeakingLevelError, EmptyException
+from src.exceptions import SteamFormatError, MediumStatusError, LeakingLevelError, EmptyException, ActualConditionError
 from src.io import read_sheet_by_index
-from src.standard import KELVIN_CONST, N8, N9, N6, N1
-from src.utils import special_roman_to_int, ignore_value
+from src.standard import KELVIN_CONST, N8, N9, N6, N1, FlowUnit, P0
+from src.utils import special_roman_to_int
 
 if typing.TYPE_CHECKING:
     from src.service.gui_service import MainService
@@ -24,7 +24,6 @@ class CalculationHandler:
     def __init__(self, service_instance: 'MainService'):
         self.service_instance = service_instance
 
-    @ignore_value
     def cal_cv_with_index(self, index: int) -> float:
         service = self.service_instance
         q = service.q(index)
@@ -34,7 +33,7 @@ class CalculationHandler:
             p2 = service.p2(index)
             delta_p_sizing = service.delta_p_sizing(index)
             delta_p_choked = service.delta_p_chocked(index)
-            rho = service.rho
+            rho = service.standard_rho
             if delta_p_choked < (p1 - p2):
                 service.dto["F_BEM_ZSLPD" + str(index + 1)] = "是"
             else:
@@ -52,7 +51,7 @@ class CalculationHandler:
                 service.dto["F_BEM_ZSLPD" + str(index + 1)] = '是'
             else:
                 service.dto["F_BEM_ZSLPD" + str(index + 1)] = '否'
-            if service.flow_unit == 'kg/h':
+            if service.flow_unit == FlowUnit.KG_H:
                 logging.debug(f"q: {q} N8: {N8} Fp: {Fp} p1: {p1} y: {y} x_sizing: {x_sizing} m: {m} t1: {t1} z1: {z1}")
                 kv = HJ.equation_gas_cv_w_value(q, N8, Fp, p1, y, x_sizing, m, t1, z1)
             else:
@@ -60,8 +59,8 @@ class CalculationHandler:
         elif service.medium_status == self.VAPOUR:
             y = service.y(index)
             x_sizing = service.x_sizing(index)
-            rho = service.rho
-            if service.flow_unit == 'kg/h':
+            rho = service.standard_rho
+            if service.flow_unit == FlowUnit.KG_H:
                 kv = HJ.equation_steam_value(q, N6, Fp, p1, y, x_sizing, rho)
             else:
                 raise SteamFormatError('蒸汽计算时，流量单位必须是kg/h')
@@ -71,7 +70,6 @@ class CalculationHandler:
             raise MediumStatusError('介质状态错误')
         return kv
 
-    @ignore_value
     def cal_noise_with_index(self, index: int) -> float:
         service = self.service_instance
         kv = service.k(index)
@@ -79,19 +77,20 @@ class CalculationHandler:
         p2 = service.p2(index)
         if service.medium_status == self.LIQUID:
             if service.is_blocked_flow(index):
-                noise = HJ.equation_noise_zsl(kv, p1, service.Pv, service.rho, p2)
+                noise = HJ.equation_noise_zsl(kv, p1, service.Pv, service.standard_rho, p2)
             else:
-                noise = HJ.equation_noise(kv, p1, service.Pv, service.rho, p2)
+                noise = HJ.equation_noise(kv, p1, service.Pv, service.standard_rho, p2)
         else:
-            noise = HJ.equation_noise_qt_value(kv, p1, service.t1(index), service.rho, p2)
+            noise = HJ.equation_noise_qt_value(kv, p1, service.t1(index), service.standard_rho, p2)
         return noise
 
-    @ignore_value
     def cal_liquid_speed_with_index(self, index: int) -> float:
         service = self.service_instance
         q = service.q(index)
+        if q is None:
+            raise ActualConditionError('工况流量为空')
         d = service.d
-        rho = service.rho
+        rho = service.standard_rho
         v = HJ.equation_liquid_speed_value(d, q)
         t1 = service.t1(index)
         p1 = service.p1(index)
@@ -99,9 +98,8 @@ class CalculationHandler:
         if service.medium_status == self.LIQUID:
             return v
         else:
-            return v * 1.01 * t1 / KELVIN_CONST / p1 * 1.5
+            return v * P0 * t1 / KELVIN_CONST / p1 * 1.5
 
-    @ignore_value
     def cal_open_rate_with_index(self, index: int) -> float:
         service = self.service_instance
         open_rate = service.open(index)
@@ -279,7 +277,13 @@ class CalculationHandler:
         return row
 
     def get_FY(self, row):
-        leaking_level = special_roman_to_int(self.service_instance.leaking_level)
+        # TODO: remove the magic number
+        return 5
+        try:
+            leaking_level = special_roman_to_int(self.service_instance.leaking_level)
+            logging.debug(f"泄漏等级: {leaking_level}")
+        except ValueError:
+            raise LeakingLevelError('泄漏等级必须是罗马数字!')
         if leaking_level == 3:
             FY = row[5]
         elif leaking_level == 4:
@@ -291,3 +295,25 @@ class CalculationHandler:
         else:
             raise LeakingLevelError('泄漏等级错误!')
         return FY
+
+    def calculate_standard_rho(self, medium_status: str, rho: float, t1: float, z1: float, p1: float) -> float | None:
+        """
+        计算标况密度
+        Parameters
+        ----------
+        medium_status : str 介质状态
+        rho : float 密度
+        t1 : float 温度
+        z1 : float 压缩因子
+        p1 : float 压力
+
+        Returns
+        -------
+        float | None 标况密度
+
+        如果数据不全，返回None
+        """
+        if rho is None or t1 is None or z1 is None or p1 is None:
+            return None
+        assert medium_status == self.GAS or medium_status == self.VAPOUR
+        return rho * t1 * P0 * z1 / (KELVIN_CONST * p1)

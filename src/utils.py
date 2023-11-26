@@ -1,9 +1,10 @@
 import logging
+import re
 
 from src.exceptions import EmptyException, FormatError, ExtractError, QueryBeforeCalculationError, UnitConversionError
 
 
-def ignore_value(func, post_process=None):
+def ignore_value(func):
     """
     Decorator to ignore empty value
     注意：这个装饰器只能用于函数，不能用于类
@@ -35,6 +36,7 @@ def ignore_value(func, post_process=None):
             logging.error(e)
             import traceback
             traceback.print_exception(e)
+            logging.error(traceback.format_exc())
             pass
 
     return wrapper
@@ -165,6 +167,8 @@ def is_char(string: str):
 def special_roman_to_int(roman_numeral: str):
     roman_bias = ord('Ⅰ') - 1  # 8543
 
+    # return 5
+
     roman_values = {
         'I': 1,
         'V': 5,
@@ -174,11 +178,21 @@ def special_roman_to_int(roman_numeral: str):
         'D': 500,
         'M': 1000,
     }
+
+    try:
+        # 如果是数字，则直接返回
+        result = int(roman_numeral)
+        return result
+    except ValueError:
+        pass
+
     if is_char(roman_numeral) and roman_bias < ord(roman_numeral) < roman_bias + 20:
         return ord(roman_numeral) - roman_bias
     else:
         total = 0
         for i, c in enumerate(roman_numeral):
+            if c not in roman_values:
+                raise ValueError(f"不是罗马数字{c}")
             if (i + 1) == len(roman_numeral) or roman_values[c] >= roman_values[roman_numeral[i + 1]]:
                 total += roman_values[c]
             else:

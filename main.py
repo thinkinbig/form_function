@@ -6,8 +6,8 @@ from src.service.gui_service import MainService
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG,
-                        # filemode='w',
-                        # filename='log.txt',
+                        filemode='w',
+                        filename='log.txt',
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     service = MainService()
     gui = GUIView(service)

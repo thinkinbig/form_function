@@ -1,3 +1,5 @@
+from enum import Enum
+
 import numpy as np
 
 from src.exceptions import UnitConversionError
@@ -17,9 +19,14 @@ N19 = 2.5
 N22 = 1730
 N27 = 77.5
 N32 = 140
+# 标准大气压 1.01325 bar
+P0 = 1.01325
 
 
-class PressureUnit:
+class PressureUnit(str, Enum):
+    """
+    Pressure unit
+    """
     BAR = "Bar"
     PA = "Pa"
     MPA = "MPa"
@@ -27,10 +34,12 @@ class PressureUnit:
     MPA_A = "MPa-a"
     PSI = "Psi"
     KPA = "KPa"
+    KPA_G = "KPa-g"
     EMPTY = ""
 
     @staticmethod
     def convert(value: float, unit: str) -> float:
+        unit = unit
         if unit == PressureUnit.BAR:
             return value
         elif unit == PressureUnit.PA:
@@ -45,13 +54,21 @@ class PressureUnit:
             return value / 14.5038
         elif unit == PressureUnit.KPA:
             return value * 0.01
+        elif unit == PressureUnit.KPA_G:
+            return PressureUnit.convert(value / 1000, PressureUnit.MPA_G)
         elif unit == PressureUnit.EMPTY:
             return value
         else:
             raise UnitConversionError(f"Unknown pressure unit: {unit}")
 
+    def __eq__(self, other):
+        return self.value.upper() == other.upper()
 
-class TemperatureUnit:
+
+class TemperatureUnit(str, Enum):
+    """
+    Temperature unit
+    """
     K = "K"
     C = "℃"
     F = "F"
@@ -70,8 +87,14 @@ class TemperatureUnit:
         else:
             raise UnitConversionError(f"Unknown temperature unit: {unit}")
 
+    def __eq__(self, other):
+        return self.value.upper() == other.upper()
 
-class DensityUnit:
+
+class DensityUnit(str, Enum):
+    """
+    Density unit
+    """
     KG_M3 = "kg/m3"
     KG_L = "kg/L"
     T_M3 = "T/m3"
@@ -90,16 +113,24 @@ class DensityUnit:
         else:
             raise UnitConversionError(f"Unknown density unit: {unit}")
 
+    def __eq__(self, other):
+        return self.value.upper() == other.upper()
 
-class FlowUnit:
+
+class FlowUnit(str, Enum):
+    """
+    Flow unit
+    """
     M3_H = "M3/H"
+    NM3_H = "Nm3/h"
     KG_H = "kg/h"
+    NKG_H = "Nkg/h"
     L_H = "L/h"
     L_MIN = "L/min"
     EMPTY = ""
 
     @staticmethod
-    def convert(value: float, unit: str) -> float:
+    def convert(value: float, unit: str, p1: float | None = None, t1: float | None = None) -> float:
         if unit == FlowUnit.M3_H:
             return value
         elif unit == FlowUnit.KG_H:
@@ -110,8 +141,25 @@ class FlowUnit:
             return value / 16.667
         elif unit == FlowUnit.EMPTY:
             return value
+        elif unit == FlowUnit.NM3_H or unit == FlowUnit.NKG_H:
+            assert p1 is not None and t1 is not None
+            return value * p1 / t1 * KELVIN_CONST / P0
         else:
             raise UnitConversionError(f"Unknown flow unit: {unit}")
+
+    def __eq__(self, other):
+        return self.value.upper() == other.upper()
+
+    def is_standard_flow_unit(self):
+        """
+        是否是标况流量单位
+        Returns
+        -------
+        bool
+            True if standard flow unit, False otherwise
+
+        """
+        return self in [FlowUnit.NKG_H, FlowUnit.NM3_H]
 
     @staticmethod
     def tune_flow(rho: float, value: float, unit: str) -> float:
@@ -129,13 +177,16 @@ class FlowUnit:
         """
         if rho == 0 or rho is None:
             raise ValueError(f"Unknown density: {rho}")
-        if unit == FlowUnit.KG_H:
+        if unit == FlowUnit.KG_H or unit == FlowUnit.NKG_H:
             return value / rho
         else:
             return value
 
 
-class MolecularWeightUnit:
+class MolecularWeightUnit(str, Enum):
+    """
+    Molecular weight unit
+    """
     G_MOL = "g/mol"
     EMPTY = ""
 
@@ -147,6 +198,9 @@ class MolecularWeightUnit:
             return value
         else:
             raise UnitConversionError(f"Unknown molecular weight unit: {unit}")
+
+    def __eq__(self, other):
+        return self.value.upper() == other.upper()
 
 
 STANDARD_UNIT = {
@@ -165,16 +219,3 @@ STANDARD_DN = np.array([
     2000])
 
 
-def get_standard_diameter(value: float) -> int:
-    """
-    Get standard diameter
-    Parameters
-    ----------
-    value : float
-        Diameter value
-    Returns
-    -------
-    float
-        Standard diameter
-    """
-    return STANDARD_DN[np.argmin(np.abs(STANDARD_DN - value))]

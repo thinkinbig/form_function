@@ -23,7 +23,7 @@ class GUIView:
                                                         initial_folder=os.getcwd()), ],
             [sg.Text('选择操作力计算数据表文件:')],
             [sg.InputText(key='-OPERATION-',
-                          default_text=os.path.join(os.getcwd(), "计算操作力表格.xlsx")),
+                          default_text=os.path.join(os.getcwd(), "操作力计算数据表.xlsx")),
              sg.FileBrowse(button_text="选择文件",
                            file_types=(('Excel Files', '*.xlsx'),
                                        ('Excel Files', '*.xls')),
