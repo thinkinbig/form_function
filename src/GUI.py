@@ -2,7 +2,7 @@ import os
 
 import PySimpleGUI as sg
 
-from src.io import is_valid_path
+from src.in_out import is_valid_path
 from src.service.gui_service import MainService
 
 

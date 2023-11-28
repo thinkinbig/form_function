@@ -10,7 +10,7 @@ from src.CalculationHandler import CalculationHandler
 from src.standard import TemperatureUnit, PressureUnit, FlowUnit, DensityUnit, MolecularWeightUnit, N2, N5
 from src.exceptions import SteamFormatError, QueryBeforeCalculationError, NotAttachedException, FormatError, \
     ExtractError, ActualConditionError
-from src.io import read_sheet_by_index, read_sheet_by_name
+from src.in_out import read_sheet_by_index, read_sheet_by_name
 from src.utils import ignore_value, EmptyException, in_to_mm, is_number, float_to_percent_str, \
     float_rounding, extract_value, is_inch, replace_inch
 
