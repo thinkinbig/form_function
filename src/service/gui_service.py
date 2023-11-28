@@ -379,19 +379,22 @@ class MainService:
             return self._density(rho, rho_unit)
         except EmptyException:
             # 如果标况密度为空，则计算标况密度
-            num = 0
-            rho = 0
-            calculation = CalculationHandler(self)
-            for i in range(3):
-                s_rho = calculation.calculate_standard_rho(self.medium_status, self.actual_rho(i), self.t1(i),
-                                                           self.z1, self.p1(i))
-                if s_rho:
-                    num += 1
-                    rho += s_rho
-            if num == 0:
-                raise EmptyException('标况密度为空')
+            if self.medium_status == '气体' or self.medium_status == "饱和蒸汽":
+                num = 0
+                rho = 0
+                calculation = CalculationHandler(self)
+                for i in range(3):
+                    s_rho = calculation.calculate_standard_rho(self.medium_status, self.actual_rho(i), self.t1(i),
+                                                               self.z1, self.p1(i))
+                    if s_rho:
+                        num += 1
+                        rho += s_rho
+                if num == 0:
+                    raise EmptyException('标况密度为空')
+                else:
+                    return rho / num
             else:
-                return rho / num
+                raise EmptyException('标况密度为空')
         except ValueError as e:
             logging.error(e)
             self.dto[self.error_flag_key] = 1
@@ -771,7 +774,8 @@ class MainService:
             m = self.dto["F_BEM_MOLZL"]
         except EmptyException:
             logging.debug(f"standard rho: {self.standard_rho}")
-            m = self.standard_rho * 22.4
+            if self.medium_status == '气体' or self.medium_status == "饱和蒸汽":
+                m = self.standard_rho * 22.4
         try:
             unit = self.dto["F_BEM_ZYDW1"]
         except EmptyException:

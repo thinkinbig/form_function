@@ -277,8 +277,6 @@ class CalculationHandler:
         return row
 
     def get_FY(self, row):
-        # TODO: remove the magic number
-        return 5
         try:
             leaking_level = special_roman_to_int(self.service_instance.leaking_level)
             logging.debug(f"泄漏等级: {leaking_level}")
