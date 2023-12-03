@@ -133,10 +133,11 @@ def is_number(string: str):
     bool
     """
     try:
-        float(string)
+        float(str(string).strip())
         return True
     except ValueError:
         return False
+
 
 
 def float_to_percent_str(my_float: float):
@@ -167,7 +168,8 @@ def is_char(string: str):
 def special_roman_to_int(roman_numeral: str):
     roman_bias = ord('Ⅰ') - 1  # 8543
 
-    # return 5
+    # # TODO： 这里的罗马数字输入有问题，临时解决方案
+    return 4
 
     roman_values = {
         'I': 1,

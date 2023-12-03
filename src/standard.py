@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 
 import numpy as np
@@ -28,6 +29,7 @@ class PressureUnit(str, Enum):
     Pressure unit
     """
     BAR = "Bar"
+    BAR_G = "Bar-g"
     PA = "Pa"
     MPA = "MPa"
     MPA_G = "MPa-g"
@@ -42,6 +44,8 @@ class PressureUnit(str, Enum):
         unit = unit
         if unit == PressureUnit.BAR:
             return value
+        elif unit == PressureUnit.BAR_G:
+            return value + 1.01
         elif unit == PressureUnit.PA:
             return value * 0.00001
         elif unit == PressureUnit.MPA:
@@ -122,16 +126,15 @@ class FlowUnit(str, Enum):
     Flow unit
     """
     M3_H = "M3/H"
-    NM3_H = "Nm3/h"
+    NM3_H = "NM3/H"
     KG_H = "kg/h"
-    NKG_H = "Nkg/h"
     L_H = "L/h"
     L_MIN = "L/min"
     EMPTY = ""
 
     @staticmethod
-    def convert(value: float, unit: str, p1: float | None = None, t1: float | None = None) -> float:
-        if unit == FlowUnit.M3_H:
+    def convert(value: float, unit: str) -> float:
+        if unit == FlowUnit.M3_H or unit == FlowUnit.NM3_H:
             return value
         elif unit == FlowUnit.KG_H:
             return value
@@ -141,14 +144,8 @@ class FlowUnit(str, Enum):
             return value / 16.667
         elif unit == FlowUnit.EMPTY:
             return value
-        elif unit == FlowUnit.NM3_H or unit == FlowUnit.NKG_H:
-            assert p1 is not None and t1 is not None
-            return value * p1 / t1 * KELVIN_CONST / P0
         else:
             raise UnitConversionError(f"Unknown flow unit: {unit}")
-
-    def __eq__(self, other):
-        return self.value.upper() == other.upper()
 
     def is_standard_flow_unit(self):
         """
@@ -159,7 +156,7 @@ class FlowUnit(str, Enum):
             True if standard flow unit, False otherwise
 
         """
-        return self in [FlowUnit.NKG_H, FlowUnit.NM3_H]
+        return self in [FlowUnit.NM3_H]
 
     @staticmethod
     def tune_flow(rho: float, value: float, unit: str) -> float:
@@ -177,7 +174,8 @@ class FlowUnit(str, Enum):
         """
         if rho == 0 or rho is None:
             raise ValueError(f"Unknown density: {rho}")
-        if unit == FlowUnit.KG_H or unit == FlowUnit.NKG_H:
+        if unit == FlowUnit.KG_H:
+            logging.debug(f"如果液体流量单位是kg/h，则除以密度: {rho}, {value}, {unit}")
             return value / rho
         else:
             return value
@@ -217,5 +215,3 @@ STANDARD_DN = np.array([
     125, 150, 200, 250, 300, 350, 400, 450, 500,
     600, 700, 800, 900, 1000, 1200, 1400, 1600, 1800,
     2000])
-
-

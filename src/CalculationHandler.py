@@ -1,7 +1,7 @@
 import logging
 import math
 import re
-import typing
+from typing import List, TYPE_CHECKING
 
 import pandas as pd
 
@@ -10,8 +10,24 @@ from src.exceptions import SteamFormatError, MediumStatusError, LeakingLevelErro
 from src.in_out import read_sheet_by_index
 from src.standard import KELVIN_CONST, N8, N9, N6, N1, FlowUnit, P0
 from src.utils import special_roman_to_int
+import bisect
 
-if typing.TYPE_CHECKING:
+
+def find_min_value_greater_than(nums, target):
+    # 排序数列
+    sorted_nums = sorted(nums)
+
+    # 使用bisect_left找到大于给定值的最小值的索引
+    index = bisect.bisect_left(sorted_nums, target)
+
+    # 检查索引是否在有效范围内
+    if index < len(sorted_nums):
+        return sorted_nums[index]
+    else:
+        return None  # 没有大于给定值的最小值
+
+
+if TYPE_CHECKING:
     from src.service.gui_service import MainService
 
 
@@ -27,19 +43,28 @@ class CalculationHandler:
     def cal_cv_with_index(self, index: int) -> float:
         service = self.service_instance
         q = service.q(index)
+        logging.debug(f"流量{index + 1}计算结果: {q}")
         Fp = service.Fp
         p1 = service.p1(index)
+        logging.debug(f"阀前{index + 1}压力: {p1}")
         if service.medium_status == self.LIQUID:
+            logging.debug(f"介质状态: {self.LIQUID}")
             p2 = service.p2(index)
+            logging.debug(f"阀后{index + 1}压力: {p2}")
             delta_p_sizing = service.delta_p_sizing(index)
+            logging.debug(f"阀前{index + 1}压力: {p1} 阀后{index + 1}压力: {p2} delta_p_sizing: {delta_p_sizing}")
             delta_p_choked = service.delta_p_chocked(index)
+            logging.debug(f"阀前{index + 1}压力: {p1} 阀后{index + 1}压力: {p2} delta_p_choked: {delta_p_choked}")
             rho = service.standard_rho
+            logging.debug(f"标况密度: {rho}")
             if delta_p_choked < (p1 - p2):
                 service.dto["F_BEM_ZSLPD" + str(index + 1)] = "是"
             else:
                 service.dto["F_BEM_ZSLPD" + str(index + 1)] = "否"
+            logging.debug(f"q: {q} N1: {N1} Fp: {Fp} delta_p_sizing: {delta_p_sizing} rho: {rho}")
             kv = HJ.equation1_value(q, N1, Fp, delta_p_sizing, rho)
         elif service.medium_status == self.GAS:
+            logging.debug(f"介质状态: {self.GAS}")
             y = service.y(index)
             x_sizing = service.x_sizing(index)
             p2 = service.p2(index)
@@ -47,20 +72,26 @@ class CalculationHandler:
             t1 = service.t1(index)
             z1 = service.z1
             x = (p1 - p2) / p1
+            logging.debug(f"y: {y} x_sizing: {x_sizing} p2: {p2} m: {m} t1: {t1} z1: {z1} x: {x}")
             if x > service.x_choked:
                 service.dto["F_BEM_ZSLPD" + str(index + 1)] = '是'
             else:
                 service.dto["F_BEM_ZSLPD" + str(index + 1)] = '否'
             if service.flow_unit == FlowUnit.KG_H:
+                logging.debug(f"流量单位: {FlowUnit.KG_H}")
                 logging.debug(f"q: {q} N8: {N8} Fp: {Fp} p1: {p1} y: {y} x_sizing: {x_sizing} m: {m} t1: {t1} z1: {z1}")
                 kv = HJ.equation_gas_cv_w_value(q, N8, Fp, p1, y, x_sizing, m, t1, z1)
             else:
                 kv = HJ.equation_gas_cv_q_value(q, N9, Fp, p1, y, x_sizing, m, t1, z1)
         elif service.medium_status == self.VAPOUR:
+            logging.debug(f"介质状态: {self.VAPOUR}")
             y = service.y(index)
             x_sizing = service.x_sizing(index)
             rho = service.standard_rho
+            logging.debug(f"标况密度: {rho}")
+            logging.debug(f"q: {q} N6: {N6} Fp: {Fp} p1: {p1} y: {y} x_sizing: {x_sizing} rho: {rho}")
             if service.flow_unit == FlowUnit.KG_H:
+                logging.debug(f"流量单位: {FlowUnit.KG_H}")
                 kv = HJ.equation_steam_value(q, N6, Fp, p1, y, x_sizing, rho)
             else:
                 raise SteamFormatError('蒸汽计算时，流量单位必须是kg/h')
@@ -119,6 +150,31 @@ class CalculationHandler:
         A = row[2]
         T = HJ.equation_torque_w1(service_instance.close_pressure, d, A)
         return T
+
+    def torque_r1(self) -> float:
+        service_instance = self.service_instance
+        # 读取关闭压差
+        closing_pressure = service_instance.close_pressure
+        # 读取阀门座通径
+        d = service_instance.d
+        torque_r1_df = read_sheet_by_index(service_instance.provider.operation, 6)
+        # 横轴关闭压差 纵轴阀门座通径
+        M, N = torque_r1_df.shape
+        # 根据阀座通径选择口径（最接近的值
+        close_pressure_list = torque_r1_df.iloc[0, 1:].tolist()
+        d_list = torque_r1_df.iloc[1:, 0].tolist()
+        i_index = bisect.bisect_left(close_pressure_list, closing_pressure)
+        j_l_index = bisect.bisect_left(d_list, d)
+        j_r_index = bisect.bisect_right(d_list, d)
+        if abs(d_list[j_r_index] - d) < abs(d_list[j_l_index] - d):
+            j_index = j_r_index
+        else:
+            j_index = j_l_index
+
+        assert 0 <= i_index < N - 1 and 0 <= j_index < M - 1
+        # 根据阀座通径和关闭压差选择力矩
+        torque = torque_r1_df.iloc[j_index, i_index]
+        return torque
 
     def get_row_by_range(self) -> pd.Series:
         service_instance = self.service_instance
@@ -294,7 +350,7 @@ class CalculationHandler:
             raise LeakingLevelError('泄漏等级错误!')
         return FY
 
-    def calculate_standard_rho(self, medium_status: str, rho: float, t1: float, z1: float, p1: float) -> float | None:
+    def calculate_rho(self, medium_status: str, rho: float, t1: float, z1: float, p1: float) -> float | None:
         """
         计算标况密度
         Parameters
@@ -313,5 +369,8 @@ class CalculationHandler:
         """
         if rho is None or t1 is None or z1 is None or p1 is None:
             return None
-        assert medium_status == self.GAS or medium_status == self.VAPOUR
-        return rho * t1 * P0 * z1 / (KELVIN_CONST * p1)
+        logging.debug(f"rho: {rho} t1: {t1} z1: {z1} p1: {p1}")
+        if medium_status == self.GAS:
+            return rho * t1 * P0 * z1 / (KELVIN_CONST * p1)
+        else:
+            return rho

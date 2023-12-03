@@ -7,7 +7,8 @@ import pandas as pd
 from src import HJ
 from src.DataTableObject import DataTableObject, NO_MARK, HIGHLIGHT_MARK, FONT_MARK
 from src.CalculationHandler import CalculationHandler
-from src.standard import TemperatureUnit, PressureUnit, FlowUnit, DensityUnit, MolecularWeightUnit, N2, N5
+from src.standard import TemperatureUnit, PressureUnit, FlowUnit, DensityUnit, MolecularWeightUnit, N2, N5, \
+    KELVIN_CONST, P0
 from src.exceptions import SteamFormatError, QueryBeforeCalculationError, NotAttachedException, FormatError, \
     ExtractError, ActualConditionError
 from src.in_out import read_sheet_by_index, read_sheet_by_name
@@ -92,6 +93,7 @@ class MainService:
             else:
                 # 读取等百分比列
                 cv = cv_row['等百分比'].values[0]
+
         else:
             # 读取额定cv
             logging.debug(f'valve type: {valve_type[:2]} valve d: {valve_d}')
@@ -245,6 +247,12 @@ class MainService:
                 self.dto[self.close_operation_key] = float_rounding(w_F0)
                 if w_F1 != 0:
                     self.dto[self.adjustment_operation_key] = float_rounding(w_F1)
+            # 球形阀门
+            elif valve_type.startswith("R1"):
+                T = calculation.torque_r1()
+                self.dto[self.open_operation_key] = float_rounding(T)
+                self.dto[self.close_operation_key] = float_rounding(T)
+
             logging.debug(f"Finish to calculate torque")
             logging.debug(f"Start to calculate force, valve type: {valve_type}")
             if valve_type.startswith('M'):
@@ -257,7 +265,9 @@ class MainService:
                 self.dto[self.close_operation_key] = float_rounding(F_c)
                 if F_o != 0:
                     self.dto[self.open_operation_key] = float_rounding(F_o)
+
             logging.debug(f"Finish to calculate force")
+
         except EmptyException as e:
             logging.debug(e)
         except QueryBeforeCalculationError as e:
@@ -275,10 +285,8 @@ class MainService:
         return TemperatureUnit.convert(value, unit)
 
     @staticmethod
-    def _flow(value: float, unit: str,
-              p1: float | None = None,
-              t1: float | None = None) -> float:
-        return FlowUnit.convert(value, unit, p1, t1)
+    def _flow(value: float, unit: str) -> float:
+        return FlowUnit.convert(value, unit)
 
     @staticmethod
     def _density(value: float, unit: str):
@@ -340,7 +348,10 @@ class MainService:
         """
         if not self.attached:
             raise NotAttachedException('Z1 accessed before attached')
-        return self.dto['F_BEM_TextYSXS']
+        if is_number(self.dto['F_BEM_TextYSXS']):
+            return float(self.dto['F_BEM_TextYSXS'])
+        else:
+            return 1
 
     @property
     def medium_status(self) -> str:
@@ -374,27 +385,36 @@ class MainService:
             raise NotAttachedException('Rho accessed before attached')
         try:
             # 读取标况密度
-            rho = self.dto['F_BEM_ROH']
-            rho_unit = self.dto['F_BEM_LLDWCOBOM11211']
-            return self._density(rho, rho_unit)
-        except EmptyException:
-            # 如果标况密度为空，则计算标况密度
-            if self.medium_status == '气体' or self.medium_status == "饱和蒸汽":
-                num = 0
-                rho = 0
-                calculation = CalculationHandler(self)
-                for i in range(3):
-                    s_rho = calculation.calculate_standard_rho(self.medium_status, self.actual_rho(i), self.t1(i),
-                                                               self.z1, self.p1(i))
-                    if s_rho:
-                        num += 1
-                        rho += s_rho
-                if num == 0:
-                    raise EmptyException('标况密度为空')
-                else:
-                    return rho / num
+            logging.debug("读取标况密度")
+            if is_number(self.dto['F_BEM_ROH']):
+                logging.debug(f"标况密度存在: {self.dto['F_BEM_ROH']}")
+                rho = float(self.dto['F_BEM_ROH'])
+                rho_unit = self.dto['F_BEM_LLDWCOBOM11211']
+                return self._density(rho, rho_unit)
             else:
                 raise EmptyException('标况密度为空')
+        except EmptyException:
+            # 如果标况密度为空，则计算标况密度
+            num = 0
+            rho = 0
+            calculation = CalculationHandler(self)
+            for i in range(3):
+                try:
+                    s_rho = calculation.calculate_rho(self.medium_status, self.actual_rho(i), self.t1(i),
+                                                      self.z1, self.p1(i))
+                    logging.debug(f"calculated rho: {s_rho} with index {i}")
+                    num += 1
+                    rho += s_rho
+                except EmptyException as e:
+                    logging.debug(f"actual rho {i + 1} is empty")
+                    pass
+            if num == 0:
+                raise EmptyException('标况密度为空')
+            else:
+                logging.debug(f"rho: {rho}, num: {num}")
+                density = rho / num
+                logging.debug(f"介质密度: {density}")
+                return density
         except ValueError as e:
             logging.error(e)
             self.dto[self.error_flag_key] = 1
@@ -421,6 +441,7 @@ class MainService:
             raise NotAttachedException('Q accessed before attached')
 
         flow_unit = self.flow_unit
+        logging.debug(f"流量单位: {flow_unit}")
 
         keys = ['F_BEM_QtyYTLL', 'F_BEM_QtyYTLLNRO', 'F_BEM_QtyYTLLmax']
 
@@ -431,52 +452,75 @@ class MainService:
 
         v = float(v)
 
-        if self.medium_status == '气体' or self.medium_status == "饱和蒸汽":
+        v = self._flow(v, flow_unit)
+        logging.debug(f"流量{index + 1}数值: {v}")
+
+        if self.medium_status == '液体':
+            logging.debug(f"介质状态液体")
+            # 液体
+            return FlowUnit.tune_flow(self.standard_rho, v, flow_unit)
+
+        #  如果饱和蒸汽的流量单位不为kg/h，则将流量单位乘以密度
+        if self.medium_status == "饱和蒸汽":
+            if flow_unit == FlowUnit.KG_H:
+                logging.debug(f"饱和蒸汽的流量单位为kg/h")
+                return v
+            else:
+                logging.debug(f"饱和蒸汽的流量单位不为kg/h，则将流量单位乘以密度")
+                v = v * self.standard_rho
+                logging.debug(f"v: {v}")
+                return v
+
+        if self.medium_status == '气体':
             standard_rho = None
-            actual_rho = None
+            logging.debug(f"介质状态气体或饱和蒸汽")
             try:
-                standard_rho = self.dto['F_BEM_ROH']
-                actual_rho = self.dto[self.actual_density_keys[index]]
+                standard_rho = float(self.dto['F_BEM_ROH'])
+                has_standard = True
+                logging.debug(f"标况密度存在: {standard_rho}")
             except EmptyException:
-                pass
-            try: # 读取温度
+                has_standard = False
+            try:  # 读取温度
                 t1 = self.t1(index)
+                logging.debug(f"温度{index + 1}: {t1}")
             except EmptyException:
                 logging.debug(f"温度{index}为空")
                 t1 = None
-            try: # 读取压力
+            try:  # 读取压力
                 p1 = self.p1(index)
             except EmptyException:
                 logging.debug(f"压力{index}为空")
                 p1 = None
 
             if flow_unit.is_standard_flow_unit():
-                if standard_rho:
+                logging.debug(f"流量单位是标况流量单位")
+                if has_standard:
                     logging.info("工况条件 标况密度(F_BEM_ROH)，标况流量(F_BEM_QtyYTLL，F_BEM_QtyYTLLNRO，F_BEM_QtyYTLLmax)，"
                                  "流量单位带N")
-                    rho = standard_rho
-                elif actual_rho:
-                    logging.info("工况条件 标况密度(F_BEM_ROH)，工况流量(F_BEM_QtyYTLL，F_BEM_QtyYTLLNRO，F_BEM_QtyYTLLmax)，"
-                                 "流量单位带N")
-                    rho = actual_rho
                 else:
-                    raise EmptyException('标况密度和工况密度都为空')
+                    logging.info(
+                        f"工况条件 工况密度(F_BEM_GKMD{index + 1})，工况流量(F_BEM_QtyYTLL，F_BEM_QtyYTLLNRO，F_BEM_QtyYTLLmax)，"
+                        "流量单位带N")
+                    standard_rho = self.standard_rho
+                return FlowUnit.tune_flow(standard_rho, v, flow_unit)
             else:
-                if standard_rho:
+                # 流量单位不带N
+                if has_standard:
                     logging.info(
-                        "工况条件 标况密度(F_BEM_ROH)，标况流量(F_BEM_QtyYTLL，F_BEM_QtyYTLLNRO，F_BEM_QtyYTLLmax)")
-                    rho = standard_rho
-                elif actual_rho:
-                    logging.info(
-                        "工况条件 标况密度(F_BEM_ROH)，工况流量(F_BEM_QtyYTLL，F_BEM_QtyYTLLNRO，F_BEM_QtyYTLLmax)")
-                    rho = actual_rho
+                        "工况条件 标况密度(F_BEM_ROH)，标况流量(F_BEM_QtyYTLL，F_BEM_QtyYTLLNRO，F_BEM_QtyYTLLmax)，流量单位不带N")
                 else:
-                    raise EmptyException('标况密度和工况密度都为空')
-
-            try:
-                return FlowUnit.tune_flow(rho, self._flow(v, flow_unit, p1, t1), flow_unit)
-            except AssertionError as e:
-                logging.error("标况流量单位下，压力和温度不能为空")
+                    logging.info(
+                        f"工况条件 工况密度(F_BEM_GKMD{index + 1})，工况流量(F_BEM_QtyYTLL，F_BEM_QtyYTLLNRO，F_BEM_QtyYTLLmax)，"
+                        f"流量单位不带N")
+                    standard_rho = self.standard_rho
+                if t1 is None or p1 is None:
+                    raise EmptyException('温度或压力为空')
+                try:
+                    v = (v * p1 * KELVIN_CONST) / (t1 * P0)
+                    return FlowUnit.tune_flow(standard_rho, v, flow_unit)
+                except ValueError as e:
+                    logging.error(e)
+                    self.dto[self.error_flag_key] = 1
 
     @property
     def cv_flag_array(self) -> list[int]:
@@ -507,7 +551,10 @@ class MainService:
         if not is_number(str(self.dto[keys[index]])):
             raise FormatError('p1 must be number')
         try:
-            return self._pressure(float(self.dto[keys[index]]), pressure_unit)
+            if is_number(self.dto[keys[index]]):
+                return self._pressure(float(self.dto[keys[index]]), pressure_unit)
+            else:
+                raise EmptyException('p1 is empty')
         except ValueError as e:
             logging.error(e)
             self.dto[self.error_flag_key] = 1
@@ -523,7 +570,10 @@ class MainService:
         if not is_number(str(self.dto[keys[index]])):
             raise FormatError('p2 must be number')
         try:
-            return self._pressure(float(self.dto[keys[index]]), pressure_unit)
+            if is_number(self.dto[keys[index]]):
+                return self._pressure(float(self.dto[keys[index]]), pressure_unit)
+            else:
+                raise EmptyException('p2 is empty')
         except ValueError as e:
             logging.error(e)
             self.dto[self.error_flag_key] = 1
@@ -660,7 +710,7 @@ class MainService:
         if not self.attached:
             raise NotAttachedException('D accessed before attached')
         try:
-            return self.dto['F_BEM_FZTJ']
+            return float(self.dto['F_BEM_FZTJ'])
         except EmptyException:
             # 若没有直接提供阀座通径的尺寸数据，则读取 F_BEM_GCTJXS 公称通径销售的数据。
             gctjxs = str(self.dto['F_BEM_GCTJXS'])
@@ -730,7 +780,9 @@ class MainService:
             raise NotAttachedException('Fl accessed before attached')
         if not self.fl_xt_fd_filled:
             raise QueryBeforeCalculationError('Fl accessed before Fl filled')
-        return self.dto["F_BEM_Fl"]
+        if not is_number(str(self.dto["F_BEM_Fl"])):
+            raise FormatError('Fl is not a number')
+        return float(self.dto["F_BEM_Fl"])
 
     @property
     def xT(self) -> float:
@@ -741,7 +793,7 @@ class MainService:
             raise NotAttachedException('xT accessed before attached')
         if not self.fl_xt_fd_filled:
             raise QueryBeforeCalculationError('xT accessed before xt filled')
-        return self.dto["F_BEM_XT"]
+        return float(self.dto["F_BEM_XT"])
 
     @property
     def Fd(self) -> float:
@@ -773,7 +825,6 @@ class MainService:
         try:
             m = self.dto["F_BEM_MOLZL"]
         except EmptyException:
-            logging.debug(f"standard rho: {self.standard_rho}")
             if self.medium_status == '气体' or self.medium_status == "饱和蒸汽":
                 m = self.standard_rho * 22.4
         try:
