@@ -168,9 +168,6 @@ def is_char(string: str):
 def special_roman_to_int(roman_numeral: str):
     roman_bias = ord('Ⅰ') - 1  # 8543
 
-    # # TODO： 这里的罗马数字输入有问题，临时解决方案
-    return 4
-
     roman_values = {
         'I': 1,
         'V': 5,
