@@ -42,7 +42,7 @@ class CalculationHandler:
 
     def cal_cv_with_index(self, index: int) -> float:
         service = self.service_instance
-        q = service.q(index)
+        q = service.q1(index)
         logging.debug(f"流量{index + 1}计算结果: {q}")
         Fp = service.Fp
         p1 = service.p1(index)
@@ -117,7 +117,7 @@ class CalculationHandler:
 
     def cal_liquid_speed_with_index(self, index: int) -> float:
         service = self.service_instance
-        q = service.q(index)
+        q = service.q1(index)
         if q is None:
             raise ActualConditionError('工况流量为空')
         d = service.d
@@ -134,7 +134,7 @@ class CalculationHandler:
     def cal_open_rate_with_index(self, index: int) -> float:
         service = self.service_instance
         open_rate = service.open(index)
-        q = service.q(index)
+        q = service.q1(index)
 
         if open_rate <= 0 or q <= 0:
             return 0

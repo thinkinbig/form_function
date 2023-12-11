@@ -209,6 +209,9 @@ class MainService:
         for i in range(3):
             try:
                 velocity = calculation.cal_liquid_speed_with_index(i)
+                if self.medium_status == '气体' or self.medium_status == '饱和蒸汽':
+                    q2 = self.q2(i)
+                    velocity = q2 / self.flow_area
                 if velocity is None:
                     continue
                 self.dto[self.liquid_speed_keys[i]] = float_rounding(velocity)
@@ -306,6 +309,16 @@ class MainService:
         if not self.attached:
             raise NotAttachedException('leaking_level accessed before attached')
         return self.dto["F_BEM_Assistant11"]
+
+    @property
+    def flow_area(self) -> float:
+        """
+        流通面积
+        Returns
+        -------
+        float : 流通面积
+        """
+        return math.pi * (self.d ** 2) / 4
 
     @property
     def flow_direction(self) -> str:
@@ -433,9 +446,9 @@ class MainService:
             logging.error(e)
             self.dto[self.error_flag_key] = 1
 
-    def q(self, index: int) -> float:
+    def q1(self, index: int) -> float:
         """
-        液体流量/气体工况流量 q
+        阀前液体流量/气体工况流量 q
         """
         if not self.attached:
             raise NotAttachedException('Q accessed before attached')
@@ -521,6 +534,16 @@ class MainService:
                 except ValueError as e:
                     logging.error(e)
                     self.dto[self.error_flag_key] = 1
+
+    def q2(self, index: int) -> float:
+        """
+        阀后液体流量/气体工况流量 q
+        """
+        p1 = self.p1(index)
+        p2 = self.p2(index)
+        q1 = self.q1(index)
+        # 前后温度一致
+        return q1 * (p1 / p2)
 
     @property
     def cv_flag_array(self) -> list[int]:
